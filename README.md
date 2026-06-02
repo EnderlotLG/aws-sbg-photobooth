@@ -139,4 +139,68 @@ Todos los iconos oficiales del AWS Student Builder Group en 7 colores cada uno:
 
 ## 📄 Licencia
 
-MIT — Libre para usar en eventos del AWS Student Builder Group.
+COPYRIGHT NOTICE & INTELLECTUAL PROPERTY DISCLAIMER
+AWS Student Builder Group Photo Booth
+Instituto Tecnológico de Ocotlán — CardenalITOs
+
+Copyright © 2026 AWS Student Builder Group at Instituto Tecnológico de Ocotlán.
+All rights reserved.
+
+AVISO LEGAL SOBRE PROPIEDAD INTELECTUAL Y MARCAS REGISTRADAS
+
+Todos los logotipos, íconos, imágenes, nombres comerciales, marcas y activos
+gráficos incluidos en este proyecto que correspondan a "Amazon Web Services",
+"AWS", "AWS Community", "AWS Student Builder Groups" y sus variantes son
+propiedad exclusiva de Amazon Web Services, Inc. y/o sus afiliados.
+Su uso en este proyecto se realiza bajo el marco del programa oficial
+AWS Student Builder Groups y está sujeto a las Directrices de Uso de Marcas
+Registradas de Amazon Web Services disponibles en:
+https://aws.amazon.com/trademark-guidelines/
+
+RESTRICCIONES DE USO
+
+Queda estrictamente prohibido, sin autorización previa y por escrito de
+Amazon Web Services, Inc. y/o del AWS Student Builder Group at ITO Ocotlán:
+
+  1. Reproducir, copiar, distribuir o sublicenciar total o parcialmente
+     los activos visuales, logotipos e íconos contenidos en este proyecto
+     con fines distintos a los eventos oficiales del programa AWS Student
+     Builder Groups.
+
+  2. Utilizar las marcas, logotipos o identidad visual de AWS, AWS Community
+     o AWS Student Builder Groups para representar, promocionar o identificar
+     productos, servicios u organizaciones no autorizadas por Amazon Web
+     Services, Inc.
+
+  3. Modificar, alterar, distorsionar o crear obras derivadas de los activos
+     gráficos protegidos sin la autorización expresa del titular de los
+     derechos de propiedad intelectual correspondiente.
+
+  4. Hacer uso de los elementos visuales de este proyecto de manera que
+     pueda inducir a confusión, engaño o asociación indebida con Amazon
+     Web Services, Inc. o cualquiera de sus programas oficiales.
+
+CÓDIGO FUENTE
+
+El código fuente de esta aplicación (HTML, CSS, JavaScript) es de autoría
+del AWS Student Builder Group at Instituto Tecnológico de Ocotlán y se
+distribuye bajo los términos de uso interno del programa. Cualquier
+reutilización del código deberá remover todos los activos visuales
+protegidos por derechos de autor antes de su redistribución.
+
+EXENCIÓN DE RESPONSABILIDAD
+
+Este proyecto es una herramienta desarrollada de forma independiente por
+miembros del programa AWS Student Builder Groups con fines educativos y
+comunitarios. No constituye un producto oficial de Amazon Web Services, Inc.
+Amazon Web Services no patrocina, avala ni es responsable del contenido,
+funcionamiento o disponibilidad de esta aplicación.
+
+Para consultas sobre licenciamiento y uso de marcas:
+  AWS Trademark: https://aws.amazon.com/trademark-guidelines/
+  Contacto SBG ITO: cardenalitos@itocotlan.com
+
+"AWS", "Amazon Web Services" y los logotipos relacionados son marcas
+registradas de Amazon.com, Inc. o sus filiales en los Estados Unidos
+y/o en otros países.
+

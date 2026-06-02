@@ -130,9 +130,9 @@ Todos los iconos oficiales del AWS Student Builder Group en 7 colores cada uno:
 
 ---
 
-## 👨‍💻 Desarrollado con
+## 👨‍💻 Desarrollado con Amor a la Comunidad AWS latam y AWS WWW
 
-**Kiro** — AI-powered development environment  
+**Ex SBG Leader ** — Fernando Gtz
 **AWS Student Builder Group at ITO Ocotlán** — CardenalITOs 💜
 
 ---

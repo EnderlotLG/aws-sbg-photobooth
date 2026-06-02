@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Student Builder Group – Photo Booth</title>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>emailjs.init("5Axz1Ne_iY6Kie-94");</script>
+  <style>
+    /* ── RESET & BASE ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1a1a2e;
+      --bg2:       #16213e;
+      --magenta:   #bf40bf;
+      --magenta2:  #9b30c4;
+      --purple:    #7b2fff;
+      --white:     #ffffff;
+      --grid-col:  rgba(191,64,191,0.10);
+      --radius:    12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Amazon Ember', 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── GRID BACKGROUND ─────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--grid-col) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-col) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────── */
+    header {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 32px;
+      background: rgba(26,26,46,0.92);
+      border-bottom: 2px solid var(--magenta);
+      backdrop-filter: blur(8px);
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-left img { height: 38px; }
+    .header-title h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .04em; }
+    .header-title p  { font-size: 0.72rem; color: var(--magenta); letter-spacing: .08em; }
+    .header-right img { height: 30px; opacity: .9; }
+
+    /* ── CHECKERBOARD ACCENT BLOCKS ──────────────────────────── */
+    .checker-strip {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      height: 28px;
+      position: relative; z-index: 5;
+    }
+    .checker-strip .cell { height: 100%; }
+    .checker-strip .cell.filled { background: var(--magenta); }
+
+    /* ── MAIN LAYOUT ─────────────────────────────────────────── */
+    .app {
+      position: relative; z-index: 5;
+      display: grid;
+      grid-template-columns: 220px 1fr 220px;
+      gap: 20px;
+      padding: 24px 20px;
+      min-height: calc(100vh - 130px);
+    }
+
+    /* ── PANELS (sticker columns) ────────────────────────────── */
+    .panel {
+      background: rgba(22,33,62,0.85);
+      border: 1px solid rgba(191,64,191,0.3);
+      border-radius: var(--radius);
+      padding: 14px 10px;
+      display: flex; flex-direction: column; gap: 10px;
+      backdrop-filter: blur(6px);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .panel h3 {
+      font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--magenta);
+      text-align: center; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(191,64,191,0.25);
+    }
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .sticker-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1.5px solid rgba(191,64,191,0.35);
+      border-radius: 8px;
+      padding: 6px 4px 5px;
+      cursor: pointer;
+      transition: border-color .2s, transform .15s, background .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-height: 80px;
+    }
+    .sticker-btn:hover {
+      border-color: var(--magenta);
+      background: rgba(191,64,191,0.2);
+      transform: scale(1.07);
+    }
+    .sticker-btn img {
+      width: 56px; height: 56px;
+      object-fit: contain;
+      display: block;
+      /* checkerboard background so transparent PNGs are visible */
+      background-image:
+        linear-gradient(45deg, #333 25%, transparent 25%),
+        linear-gradient(-45deg, #333 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #333 75%),
+        linear-gradient(-45deg, transparent 75%, #333 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+      border-radius: 4px;
+    }
+    .sticker-btn.ito img {
+      width: 52px; height: 52px;
+      border-radius: 6px;
+    }
+    /* label under each sticker button */
+    .sticker-btn span {
+      display: block;
+      font-size: 0.58rem;
+      color: rgba(255,255,255,0.45);
+      text-align: center;
+      margin-top: 3px;
+      line-height: 1.2;
+      max-width: 64px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── CENTER CANVAS AREA ──────────────────────────────────── */
+    .canvas-area {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 16px;
+    }
+    #stage {
+      position: relative;
+      width: 540px; max-width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #111;
+      border-radius: var(--radius);
+      border: 2px solid rgba(191,64,191,0.4);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    #stage video, #stage canvas#photo-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    /* Frame overlay */
+    #frame-overlay {
+      position: absolute; inset: 0; z-index: 20;
+      pointer-events: none;
+      display: none;
+    }
+    .frame-border {
+      position: absolute; inset: 0;
+      border: 4px solid rgba(255,255,255,0.9);
+      border-radius: 4px;
+    }
+    .frame-label {
+      position: absolute; top: 10px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.85rem; font-weight: 700;
+      color: #fff; letter-spacing: .06em;
+      text-shadow: 0 1px 4px rgba(0,0,0,.7);
+      white-space: nowrap;
+    }
+    .frame-sbg-logo {
+      position: absolute; bottom: 10px; left: 12px;
+      height: 36px;
+    }
+    .frame-aws-logo {
+      position: absolute; top: 8px; right: 10px;
+      height: 28px;
+    }
+    /* AWS watermark always visible */
+    #aws-watermark {
+      position: absolute; bottom: 14px; right: 14px;
+      z-index: 30; height: 36px;
+      pointer-events: none;
+      opacity: 0.92;
+      display: none;
+    }
+
+    /* ── DRAGGABLE STICKERS ON STAGE ─────────────────────────── */
+    .placed-sticker {
+      position: absolute; z-index: 25;
+      cursor: grab; user-select: none;
+      touch-action: none;
+    }
+    .placed-sticker:active { cursor: grabbing; }
+    .placed-sticker img { width: 80px; height: 80px; object-fit: contain; display: block; }
+    .placed-sticker .delete-btn {
+      position: absolute; top: -8px; right: -8px;
+      background: var(--magenta); color: #fff;
+      border: none; border-radius: 50%; width: 20px; height: 20px;
+      font-size: 12px; cursor: pointer; line-height: 20px; text-align: center;
+      display: none;
+    }
+    .placed-sticker:hover .delete-btn { display: block; }
+    .placed-sticker .resize-handle {
+      position: absolute; bottom: -6px; right: -6px;
+      width: 14px; height: 14px;
+      background: var(--magenta); border-radius: 50%;
+      cursor: se-resize; display: none;
+    }
+    .placed-sticker:hover .resize-handle { display: block; }
+
+    /* ── PLACEHOLDER (before camera) ────────────────────────── */
+    #placeholder {
+      position: absolute; inset: 0; z-index: 5;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: linear-gradient(135deg, #1a1a2e 60%, #2d1b4e);
+    }
+    #placeholder svg { opacity: .3; }
+    #placeholder p { color: rgba(255,255,255,.4); font-size: .9rem; }
+
+    /* ── CONTROLS ────────────────────────────────────────────── */
+    .controls {
+      display: flex; flex-wrap: wrap;
+      gap: 10px; justify-content: center;
+    }
+    .btn {
+      padding: 10px 22px; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 700;
+      letter-spacing: .04em; cursor: pointer;
+      border: none; transition: transform .15s, opacity .2s;
+    }
+    .btn:active { transform: scale(.96); }
+    .btn-primary {
+      background: var(--magenta);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(191,64,191,.45);
+    }
+    .btn-primary:hover { opacity: .88; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--magenta);
+      border: 2px solid var(--magenta);
+    }
+    .btn-secondary:hover { background: rgba(191,64,191,.12); }
+    .btn-download {
+      background: linear-gradient(135deg, var(--magenta), var(--purple));
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(123,47,255,.4);
+    }
+    .btn-danger {
+      background: transparent;
+      color: #e05; border: 2px solid #e05;
+    }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── EMAIL BUTTON ────────────────────────────────────────── */
+    .btn-send {
+      background: linear-gradient(135deg, #16213e, #1a1a2e);
+      color: var(--magenta);
+      border: 2px solid var(--magenta);
+      box-shadow: 0 4px 18px rgba(191,64,191,.25);
+    }
+    .btn-send:hover { background: rgba(191,64,191,.15); }
+
+    /* ── MODAL OVERLAY ───────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(10,10,20,.85);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1.5px solid var(--magenta);
+      border-radius: 18px;
+      padding: 36px 32px;
+      width: min(460px, 92vw);
+      box-shadow: 0 24px 64px rgba(191,64,191,.35);
+      position: relative;
+    }
+    .modal h2 {
+      color: var(--magenta); font-size: 1.2rem;
+      margin-bottom: 6px; letter-spacing: .04em;
+    }
+    .modal p { font-size: .82rem; color: rgba(255,255,255,.55); margin-bottom: 22px; }
+    .modal label { display: block; font-size: .8rem; color: rgba(255,255,255,.65);
+                   margin-bottom: 4px; }
+    .modal input[type=text],
+    .modal input[type=email] {
+      width: 100%; padding: 10px 14px;
+      background: rgba(26,26,46,.9);
+      border: 1.5px solid rgba(191,64,191,.35);
+      border-radius: 8px; color: #fff; font-size: .92rem;
+      margin-bottom: 16px; outline: none;
+      transition: border-color .2s;
+    }
+    .modal input:focus { border-color: var(--magenta); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+    .modal-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; color: rgba(255,255,255,.4);
+      font-size: 1.4rem; cursor: pointer; line-height: 1;
+    }
+    .modal-close:hover { color: #fff; }
+    .send-status {
+      font-size: .8rem; text-align: center; margin-top: 10px;
+      min-height: 20px; letter-spacing: .03em;
+    }
+    .send-status.ok  { color: #4cff91; }
+    .send-status.err { color: #ff4c6a; }
+
+    /* ── FRAME TOGGLE ────────────────────────────────────────── */
+    .frame-toggle-wrap {
+      display: flex; align-items: center; gap: 10px;
+      font-size: .8rem; color: rgba(255,255,255,.6);
+    }
+    .toggle { appearance: none; width: 36px; height: 20px;
+      background: rgba(191,64,191,.25); border-radius: 10px;
+      cursor: pointer; position: relative; transition: background .2s; }
+    .toggle:checked { background: var(--magenta); }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px;
+      width: 14px; height: 14px; border-radius: 50%; background: #fff;
+      transition: left .2s; }
+    .toggle:checked::after { left: 19px; }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .panel { flex-direction: row; max-height: none; overflow-x: auto;
+               overflow-y: visible; flex-wrap: wrap; }
+      .sticker-grid { grid-template-columns: repeat(4,1fr); }
+      #stage { width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <img src="https://i.ibb.co/N6b29RVr/AWS-Student-Builder-Group-RGB-Program-Icon-Magenta.png" alt="SBG Logo" />
+      <div class="header-title">
+        <h1>AWS Student Builder Group</h1>
+        <p>at Instituto Tecnológico de Ocotlán &nbsp;·&nbsp; Photo Booth</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <img src="https://i.ibb.co/R4Y7qhGL/AWS-logo-RGB-WHT.png" alt="AWS" />
+    </div>
+  </header>
+
+  <!-- CHECKER STRIP -->
+  <div class="checker-strip">
+    <div class="cell filled"></div><div class="cell"></div>
+    <div class="cell filled"></div><div class="cell"></div>
+    <div class="cell filled"></div><div class="cell"></div>
+    <div class="cell filled"></div><div class="cell"></div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div class="app">
+
+    <!-- LEFT PANEL: ITO + SBG Icons -->
+    <aside class="panel" id="panel-left">
+      <h3>🎨 ITO &amp; SBG</h3>
+      <div class="sticker-grid">
+        <button class="sticker-btn ito" data-src="https://i.ibb.co/C3xtpzt1/ito-black.png" title="ITO Black">
+          <img src="https://i.ibb.co/C3xtpzt1/ito-black.png" alt="ITO Black" />
+          <span>ITO Black</span>
+        </button>
+        <button class="sticker-btn ito" data-src="https://i.ibb.co/6cMBsmJ6/ito-magenta.png" title="ITO Magenta">
+          <img src="https://i.ibb.co/6cMBsmJ6/ito-magenta.png" alt="ITO Magenta" />
+          <span>ITO Magenta</span>
+        </button>
+        <!-- SBG Program Icons -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/N6b29RVr/AWS-Student-Builder-Group-RGB-Program-Icon-Magenta.png" title="SBG Magenta">
+          <img src="https://i.ibb.co/N6b29RVr/AWS-Student-Builder-Group-RGB-Program-Icon-Magenta.png" alt="SBG Magenta" />
+          <span>SBG 💜</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/q3mBbW3d/AWS-Student-Builder-Group-RGB-Program-Icon-Purple.png" title="SBG Purple">
+          <img src="https://i.ibb.co/q3mBbW3d/AWS-Student-Builder-Group-RGB-Program-Icon-Purple.png" alt="SBG Purple" />
+          <span>SBG Púrpura</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/JRdhvt3v/AWS-Student-Builder-Group-RGB-Program-Icon-Blue.png" title="SBG Blue">
+          <img src="https://i.ibb.co/JRdhvt3v/AWS-Student-Builder-Group-RGB-Program-Icon-Blue.png" alt="SBG Blue" />
+          <span>SBG 🔵</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/84SFLgzt/AWS-Student-Builder-Group-RGB-Program-Icon-Amber.png" title="SBG Amber">
+          <img src="https://i.ibb.co/84SFLgzt/AWS-Student-Builder-Group-RGB-Program-Icon-Amber.png" alt="SBG Amber" />
+          <span>SBG 🟡</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/rK3c5TZf/AWS-Student-Builder-Group-RGB-Program-Icon-Mint.png" title="SBG Mint">
+          <img src="https://i.ibb.co/rK3c5TZf/AWS-Student-Builder-Group-RGB-Program-Icon-Mint.png" alt="SBG Mint" />
+          <span>SBG Mint</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/zht0VtMS/AWS-Student-Builder-Group-RGB-Program-Icon-White.png" title="SBG White">
+          <img src="https://i.ibb.co/zht0VtMS/AWS-Student-Builder-Group-RGB-Program-Icon-White.png" alt="SBG White" />
+          <span>SBG ⬜</span>
+        </button>
+        <!-- AWS Logos -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/R4Y7qhGL/AWS-logo-RGB-WHT.png" title="AWS Logo White">
+          <img src="https://i.ibb.co/R4Y7qhGL/AWS-logo-RGB-WHT.png" alt="AWS White" />
+          <span>AWS White</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/Ng3GhCf7/AWS-smile-RGB-WHT.png" title="AWS Smile">
+          <img src="https://i.ibb.co/Ng3GhCf7/AWS-smile-RGB-WHT.png" alt="AWS Smile" />
+          <span>AWS Smile</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/q3tQhVzK/AWS-logo-RGB-BLK.png" title="AWS Logo Black">
+          <img src="https://i.ibb.co/q3tQhVzK/AWS-logo-RGB-BLK.png" alt="AWS Black" />
+          <span>AWS Black</span>
+        </button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/fz6qT5yw/AWS-logo-RGB-REV.png" title="AWS Logo REV">
+          <img src="https://i.ibb.co/fz6qT5yw/AWS-logo-RGB-REV.png" alt="AWS REV" />
+          <span>AWS REV</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CENTER: Camera + Canvas -->
+    <main class="canvas-area">
+      <div id="stage">
+        <!-- Placeholder -->
+        <div id="placeholder">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#bf40bf" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <p>Presiona "Abrir Cámara" para comenzar</p>
+        </div>
+
+        <!-- Video stream -->
+        <video id="video" autoplay playsinline style="display:none;"></video>
+
+        <!-- Photo canvas -->
+        <canvas id="photo-canvas" style="display:none;"></canvas>
+
+        <!-- Frame overlay (HTML preview) -->
+        <div id="frame-overlay">
+          <div class="frame-border"></div>
+          <div class="frame-label">AWS Student Builder Group</div>
+          <img class="frame-sbg-logo"
+               src="https://i.ibb.co/zht0VtMS/AWS-Student-Builder-Group-RGB-Program-Icon-White.png"
+               alt="SBG" />
+          <img class="frame-aws-logo"
+               src="https://i.ibb.co/R4Y7qhGL/AWS-logo-RGB-WHT.png"
+               alt="AWS" />
+        </div>
+
+        <!-- AWS watermark always on photo -->
+        <img id="aws-watermark"
+             src="https://i.ibb.co/Ng3GhCf7/AWS-smile-RGB-WHT.png"
+             alt="aws" />
+      </div>
+
+      <!-- CONTROLS -->
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-open-cam">
+          📷 Abrir Cámara
+        </button>
+        <button class="btn btn-secondary" id="btn-snap" disabled>
+          ✨ Tomar Foto
+        </button>
+        <button class="btn btn-secondary" id="btn-retake" disabled>
+          🔄 Retomar
+        </button>
+        <button class="btn btn-download" id="btn-download" disabled>
+          ⬇ Descargar
+        </button>
+        <button class="btn btn-send" id="btn-send" disabled>
+          📧 Enviar por correo
+        </button>
+        <button class="btn btn-danger" id="btn-clear" disabled>
+          🗑 Limpiar
+        </button>
+      </div>
+
+      <!-- Frame toggle -->
+      <div class="frame-toggle-wrap">
+        <input type="checkbox" class="toggle" id="toggle-frame" />
+        <label for="toggle-frame">Marco AWS Student Builder Group</label>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL: Category Icons -->
+    <aside class="panel" id="panel-right">
+      <h3>🏷 Iconos SBG</h3>
+      <div class="sticker-grid">
+        <!-- EQUIPO: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/RTDrPrCV/AWS-Student-Builder-Group-RGB-Icons-Teams-Magenta.png" title="Equipo Magenta"><img src="https://i.ibb.co/RTDrPrCV/AWS-Student-Builder-Group-RGB-Icons-Teams-Magenta.png" alt="Equipo 💜"/><span>Equipo 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/DffqWWsx/AWS-Student-Builder-Group-RGB-Icons-Teams-Blue.png" title="Equipo Blue"><img src="https://i.ibb.co/DffqWWsx/AWS-Student-Builder-Group-RGB-Icons-Teams-Blue.png" alt="Equipo 🔵"/><span>Equipo 🔵</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/QFmSLJ4J/AWS-Student-Builder-Group-RGB-Icons-Teams-Purple.png" title="Equipo Purple"><img src="https://i.ibb.co/QFmSLJ4J/AWS-Student-Builder-Group-RGB-Icons-Teams-Purple.png" alt="Equipo Pú"/><span>Equipo Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/SDrp8hzp/AWS-Student-Builder-Group-RGB-Icons-Teams-Amber.png" title="Equipo Amber"><img src="https://i.ibb.co/SDrp8hzp/AWS-Student-Builder-Group-RGB-Icons-Teams-Amber.png" alt="Equipo 🟡"/><span>Equipo 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/gMpxn2Fn/AWS-Student-Builder-Group-RGB-Icons-Teams-Mint.png" title="Equipo Mint"><img src="https://i.ibb.co/gMpxn2Fn/AWS-Student-Builder-Group-RGB-Icons-Teams-Mint.png" alt="Equipo Mint"/><span>Equipo Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/jpQQp0k/AWS-Student-Builder-Group-RGB-Icons-Teams-Grey-850.png" title="Equipo Grey"><img src="https://i.ibb.co/jpQQp0k/AWS-Student-Builder-Group-RGB-Icons-Teams-Grey-850.png" alt="Equipo Grey"/><span>Equipo Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/h1g3k1Zj/AWS-Student-Builder-Group-RGB-Icons-Teams-White.png" title="Equipo White"><img src="https://i.ibb.co/h1g3k1Zj/AWS-Student-Builder-Group-RGB-Icons-Teams-White.png" alt="Equipo ⬜"/><span>Equipo ⬜</span></button>
+        <!-- ESCALERA: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/przC4Cfx/AWS-Student-Builder-Group-RGB-Icons-Ladder-Magenta.jpg" title="Escalera Magenta"><img src="https://i.ibb.co/przC4Cfx/AWS-Student-Builder-Group-RGB-Icons-Ladder-Magenta.jpg" alt="Escalera 💜"/><span>Escalera 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/8L8PbQRF/AWS-Student-Builder-Group-RGB-Icons-Ladder-Blue.jpg" title="Escalera Blue"><img src="https://i.ibb.co/8L8PbQRF/AWS-Student-Builder-Group-RGB-Icons-Ladder-Blue.jpg" alt="Escalera 🔵"/><span>Escalera 🔵</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/6cQwXdMS/AWS-Student-Builder-Group-RGB-Icons-Ladder-Purple.jpg" title="Escalera Purple"><img src="https://i.ibb.co/6cQwXdMS/AWS-Student-Builder-Group-RGB-Icons-Ladder-Purple.jpg" alt="Escalera Pú"/><span>Escalera Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/SXTn7xdX/AWS-Student-Builder-Group-RGB-Icons-Ladder-Amber.jpg" title="Escalera Amber"><img src="https://i.ibb.co/SXTn7xdX/AWS-Student-Builder-Group-RGB-Icons-Ladder-Amber.jpg" alt="Escalera 🟡"/><span>Escalera 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/zVbCWTQw/AWS-Student-Builder-Group-RGB-Icons-Ladder-Mint.jpg" title="Escalera Mint"><img src="https://i.ibb.co/zVbCWTQw/AWS-Student-Builder-Group-RGB-Icons-Ladder-Mint.jpg" alt="Escalera Mint"/><span>Escalera Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/jvkPvhJ2/AWS-Student-Builder-Group-RGB-Icons-Ladder-Grey-850.jpg" title="Escalera Grey"><img src="https://i.ibb.co/jvkPvhJ2/AWS-Student-Builder-Group-RGB-Icons-Ladder-Grey-850.jpg" alt="Escalera Grey"/><span>Escalera Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/DD1Fg1vx/AWS-Student-Builder-Group-RGB-Icons-Ladder-White.jpg" title="Escalera White"><img src="https://i.ibb.co/DD1Fg1vx/AWS-Student-Builder-Group-RGB-Icons-Ladder-White.jpg" alt="Escalera ⬜"/><span>Escalera ⬜</span></button>
+        <!-- GOTA: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/ycfZFV7q/AWS-Student-Builder-Group-RGB-Icons-Drop-Magenta.png" title="Gota Magenta"><img src="https://i.ibb.co/ycfZFV7q/AWS-Student-Builder-Group-RGB-Icons-Drop-Magenta.png" alt="Gota 💜"/><span>Gota 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/fGPXF4bJ/AWS-Student-Builder-Group-RGB-Icons-Drop-Blue.png" title="Gota Blue"><img src="https://i.ibb.co/fGPXF4bJ/AWS-Student-Builder-Group-RGB-Icons-Drop-Blue.png" alt="Gota 🔵"/><span>Gota 🔵</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/vvYbs2wt/AWS-Student-Builder-Group-RGB-Icons-Drop-Purple.png" title="Gota Purple"><img src="https://i.ibb.co/vvYbs2wt/AWS-Student-Builder-Group-RGB-Icons-Drop-Purple.png" alt="Gota Pú"/><span>Gota Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/7tCYdbxp/AWS-Student-Builder-Group-RGB-Icons-Drop-Amber.png" title="Gota Amber"><img src="https://i.ibb.co/7tCYdbxp/AWS-Student-Builder-Group-RGB-Icons-Drop-Amber.png" alt="Gota 🟡"/><span>Gota 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/QjjvQQCh/AWS-Student-Builder-Group-RGB-Icons-Drop-Mint.png" title="Gota Mint"><img src="https://i.ibb.co/QjjvQQCh/AWS-Student-Builder-Group-RGB-Icons-Drop-Mint.png" alt="Gota Mint"/><span>Gota Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/DDmQMG3J/AWS-Student-Builder-Group-RGB-Icons-Drop-Grey-850.png" title="Gota Grey"><img src="https://i.ibb.co/DDmQMG3J/AWS-Student-Builder-Group-RGB-Icons-Drop-Grey-850.png" alt="Gota Grey"/><span>Gota Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/8gYmLkW4/AWS-Student-Builder-Group-RGB-Icons-Drop-White.png" title="Gota White"><img src="https://i.ibb.co/8gYmLkW4/AWS-Student-Builder-Group-RGB-Icons-Drop-White.png" alt="Gota ⬜"/><span>Gota ⬜</span></button>
+        <!-- RAYO: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/LzXZ7Zg5/AWS-Student-Builder-Group-RGB-Icons-Bolt-Magenta.png" title="Rayo Magenta"><img src="https://i.ibb.co/LzXZ7Zg5/AWS-Student-Builder-Group-RGB-Icons-Bolt-Magenta.png" alt="Rayo 💜"/><span>Rayo 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/Hf0BXWqp/AWS-Student-Builder-Group-RGB-Icons-Bolt-Blue.png" title="Rayo Blue"><img src="https://i.ibb.co/Hf0BXWqp/AWS-Student-Builder-Group-RGB-Icons-Bolt-Blue.png" alt="Rayo 🔵"/><span>Rayo �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/pvKcgSyQ/AWS-Student-Builder-Group-RGB-Icons-Bolt-Purple.png" title="Rayo Purple"><img src="https://i.ibb.co/pvKcgSyQ/AWS-Student-Builder-Group-RGB-Icons-Bolt-Purple.png" alt="Rayo Pú"/><span>Rayo Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/9kV5chhc/AWS-Student-Builder-Group-RGB-Icons-Bolt-Amber.png" title="Rayo Amber"><img src="https://i.ibb.co/9kV5chhc/AWS-Student-Builder-Group-RGB-Icons-Bolt-Amber.png" alt="Rayo 🟡"/><span>Rayo 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/Fb2qcX34/AWS-Student-Builder-Group-RGB-Icons-Bolt-Mint.png" title="Rayo Mint"><img src="https://i.ibb.co/Fb2qcX34/AWS-Student-Builder-Group-RGB-Icons-Bolt-Mint.png" alt="Rayo Mint"/><span>Rayo Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/sd8FhtMQ/AWS-Student-Builder-Group-RGB-Icons-Bolt-Grey-850.png" title="Rayo Grey"><img src="https://i.ibb.co/sd8FhtMQ/AWS-Student-Builder-Group-RGB-Icons-Bolt-Grey-850.png" alt="Rayo Grey"/><span>Rayo Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/XfZtwts3/AWS-Student-Builder-Group-RGB-Icons-Bolt-White.png" title="Rayo White"><img src="https://i.ibb.co/XfZtwts3/AWS-Student-Builder-Group-RGB-Icons-Bolt-White.png" alt="Rayo ⬜"/><span>Rayo ⬜</span></button>
+        <!-- RELOJ: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/Q7zx4Kph/AWS-Student-Builder-Group-RGB-Icons-Clock-Magenta.png" title="Reloj Magenta"><img src="https://i.ibb.co/Q7zx4Kph/AWS-Student-Builder-Group-RGB-Icons-Clock-Magenta.png" alt="Reloj 💜"/><span>Reloj 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/mFYCqtvG/AWS-Student-Builder-Group-RGB-Icons-Clock-Blue.png" title="Reloj Blue"><img src="https://i.ibb.co/mFYCqtvG/AWS-Student-Builder-Group-RGB-Icons-Clock-Blue.png" alt="Reloj 🔵"/><span>Reloj �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/1G1MgPRg/AWS-Student-Builder-Group-RGB-Icons-Clock-Purple.png" title="Reloj Purple"><img src="https://i.ibb.co/1G1MgPRg/AWS-Student-Builder-Group-RGB-Icons-Clock-Purple.png" alt="Reloj Pú"/><span>Reloj Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/7JGnkRG6/AWS-Student-Builder-Group-RGB-Icons-Clock-Amber.png" title="Reloj Amber"><img src="https://i.ibb.co/7JGnkRG6/AWS-Student-Builder-Group-RGB-Icons-Clock-Amber.png" alt="Reloj 🟡"/><span>Reloj 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/mV7tTKf3/AWS-Student-Builder-Group-RGB-Icons-Clock-Mint.png" title="Reloj Mint"><img src="https://i.ibb.co/mV7tTKf3/AWS-Student-Builder-Group-RGB-Icons-Clock-Mint.png" alt="Reloj Mint"/><span>Reloj Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/gKx97TP/AWS-Student-Builder-Group-RGB-Icons-Clock-Grey-850.png" title="Reloj Grey"><img src="https://i.ibb.co/gKx97TP/AWS-Student-Builder-Group-RGB-Icons-Clock-Grey-850.png" alt="Reloj Grey"/><span>Reloj Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/zTsCbb6Q/AWS-Student-Builder-Group-RGB-Icons-Clock-White.png" title="Reloj White"><img src="https://i.ibb.co/zTsCbb6Q/AWS-Student-Builder-Group-RGB-Icons-Clock-White.png" alt="Reloj ⬜"/><span>Reloj ⬜</span></button>
+        <!-- LLAVE (KEY): 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/BV5rwpJM/AWS-Student-Builder-Group-RGB-Icons-Key-Magenta.png" title="Llave Magenta"><img src="https://i.ibb.co/BV5rwpJM/AWS-Student-Builder-Group-RGB-Icons-Key-Magenta.png" alt="Llave 💜"/><span>Llave 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/fVJkL2Bv/AWS-Student-Builder-Group-RGB-Icons-Key-Blue.png" title="Llave Blue"><img src="https://i.ibb.co/fVJkL2Bv/AWS-Student-Builder-Group-RGB-Icons-Key-Blue.png" alt="Llave 🔵"/><span>Llave �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/v4NNnrkm/AWS-Student-Builder-Group-RGB-Icons-Key-Purple.png" title="Llave Purple"><img src="https://i.ibb.co/v4NNnrkm/AWS-Student-Builder-Group-RGB-Icons-Key-Purple.png" alt="Llave Pú"/><span>Llave Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/FqsXWbdF/AWS-Student-Builder-Group-RGB-Icons-Key-Amber.png" title="Llave Amber"><img src="https://i.ibb.co/FqsXWbdF/AWS-Student-Builder-Group-RGB-Icons-Key-Amber.png" alt="Llave 🟡"/><span>Llave 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/nNCBjHtq/AWS-Student-Builder-Group-RGB-Icons-Key-Mint.png" title="Llave Mint"><img src="https://i.ibb.co/nNCBjHtq/AWS-Student-Builder-Group-RGB-Icons-Key-Mint.png" alt="Llave Mint"/><span>Llave Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/9312DW3v/AWS-Student-Builder-Group-RGB-Icons-Key-Grey-850.png" title="Llave Grey"><img src="https://i.ibb.co/9312DW3v/AWS-Student-Builder-Group-RGB-Icons-Key-Grey-850.png" alt="Llave Grey"/><span>Llave Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/KcfybGwM/AWS-Student-Builder-Group-RGB-Icons-Key-White.png" title="Llave White"><img src="https://i.ibb.co/KcfybGwM/AWS-Student-Builder-Group-RGB-Icons-Key-White.png" alt="Llave ⬜"/><span>Llave ⬜</span></button>
+        <!-- TROFEO: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/2319j69f/AWS-Student-Builder-Group-RGB-Icons-Trophy-Magenta.png" title="Trofeo Magenta"><img src="https://i.ibb.co/2319j69f/AWS-Student-Builder-Group-RGB-Icons-Trophy-Magenta.png" alt="Trofeo 💜"/><span>Trofeo 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/CGyDnvd/AWS-Student-Builder-Group-RGB-Icons-Trophy-Blue.png" title="Trofeo Blue"><img src="https://i.ibb.co/CGyDnvd/AWS-Student-Builder-Group-RGB-Icons-Trophy-Blue.png" alt="Trofeo 🔵"/><span>Trofeo �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/TD4PmVY2/AWS-Student-Builder-Group-RGB-Icons-Trophy-Purple.png" title="Trofeo Purple"><img src="https://i.ibb.co/TD4PmVY2/AWS-Student-Builder-Group-RGB-Icons-Trophy-Purple.png" alt="Trofeo Pú"/><span>Trofeo Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/zWjwKRSn/AWS-Student-Builder-Group-RGB-Icons-Trophy-Amber.png" title="Trofeo Amber"><img src="https://i.ibb.co/zWjwKRSn/AWS-Student-Builder-Group-RGB-Icons-Trophy-Amber.png" alt="Trofeo 🟡"/><span>Trofeo 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/RGPmGj6c/AWS-Student-Builder-Group-RGB-Icons-Trophy-Mint.png" title="Trofeo Mint"><img src="https://i.ibb.co/RGPmGj6c/AWS-Student-Builder-Group-RGB-Icons-Trophy-Mint.png" alt="Trofeo Mint"/><span>Trofeo Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/sp8rvS07/AWS-Student-Builder-Group-RGB-Icons-Trophy-Grey-850.png" title="Trofeo Grey"><img src="https://i.ibb.co/sp8rvS07/AWS-Student-Builder-Group-RGB-Icons-Trophy-Grey-850.png" alt="Trofeo Grey"/><span>Trofeo Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/hFRFwq6p/AWS-Student-Builder-Group-RGB-Icons-Trophy-White.png" title="Trofeo White"><img src="https://i.ibb.co/hFRFwq6p/AWS-Student-Builder-Group-RGB-Icons-Trophy-White.png" alt="Trofeo ⬜"/><span>Trofeo ⬜</span></button>
+        <!-- SPEAKER: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/Fk42SRvy/AWS-Student-Builder-Group-RGB-Icons-Speaker-Magenta.png" title="Speaker Magenta"><img src="https://i.ibb.co/Fk42SRvy/AWS-Student-Builder-Group-RGB-Icons-Speaker-Magenta.png" alt="Speaker 💜"/><span>Speaker 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/5gxwcFSN/AWS-Student-Builder-Group-RGB-Icons-Speaker-Blue.png" title="Speaker Blue"><img src="https://i.ibb.co/5gxwcFSN/AWS-Student-Builder-Group-RGB-Icons-Speaker-Blue.png" alt="Speaker 🔵"/><span>Speaker �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/pBDXJS2S/AWS-Student-Builder-Group-RGB-Icons-Speaker-Purple.png" title="Speaker Purple"><img src="https://i.ibb.co/pBDXJS2S/AWS-Student-Builder-Group-RGB-Icons-Speaker-Purple.png" alt="Speaker Pú"/><span>Speaker Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/gMVqCfGQ/AWS-Student-Builder-Group-RGB-Icons-Speaker-Amber.png" title="Speaker Amber"><img src="https://i.ibb.co/gMVqCfGQ/AWS-Student-Builder-Group-RGB-Icons-Speaker-Amber.png" alt="Speaker 🟡"/><span>Speaker 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/v9C31LR/AWS-Student-Builder-Group-RGB-Icons-Speaker-Mint.png" title="Speaker Mint"><img src="https://i.ibb.co/v9C31LR/AWS-Student-Builder-Group-RGB-Icons-Speaker-Mint.png" alt="Speaker Mint"/><span>Speaker Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/FLYkgDD5/AWS-Student-Builder-Group-RGB-Icons-Speaker-Grey-850.png" title="Speaker Grey"><img src="https://i.ibb.co/FLYkgDD5/AWS-Student-Builder-Group-RGB-Icons-Speaker-Grey-850.png" alt="Speaker Grey"/><span>Speaker Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/cKNZNw5Y/AWS-Student-Builder-Group-RGB-Icons-Speaker-White.png" title="Speaker White"><img src="https://i.ibb.co/cKNZNw5Y/AWS-Student-Builder-Group-RGB-Icons-Speaker-White.png" alt="Speaker ⬜"/><span>Speaker ⬜</span></button>
+        <!-- SMILE CORCHETE: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/yc6yXSfb/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Magenta.png" title="Smile Magenta"><img src="https://i.ibb.co/yc6yXSfb/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Magenta.png" alt="Smile 💜"/><span>Smile 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/rGPDrGn8/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Blue.png" title="Smile Blue"><img src="https://i.ibb.co/rGPDrGn8/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Blue.png" alt="Smile 🔵"/><span>Smile 🔵</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/3YCFKxZn/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Purple.png" title="Smile Purple"><img src="https://i.ibb.co/3YCFKxZn/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Purple.png" alt="Smile Pú"/><span>Smile Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/5WfvYgkN/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Amber.png" title="Smile Amber"><img src="https://i.ibb.co/5WfvYgkN/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Amber.png" alt="Smile 🟡"/><span>Smile 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/xqBW1P8r/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Mint.png" title="Smile Mint"><img src="https://i.ibb.co/xqBW1P8r/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Mint.png" alt="Smile Mint"/><span>Smile Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/qY6sjzrp/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Grey-850.png" title="Smile Grey"><img src="https://i.ibb.co/qY6sjzrp/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-Grey-850.png" alt="Smile Grey"/><span>Smile Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/99rDtKxX/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-White.png" title="Smile White"><img src="https://i.ibb.co/99rDtKxX/AWS-Student-Builder-Group-RGB-Icons-Single-Bracket-Smile-White.png" alt="Smile ⬜"/><span>Smile ⬜</span></button>
+        <!-- SMILE DOBLE: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/GfQxZ7y9/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Magenta.png" title="Smile2 Magenta"><img src="https://i.ibb.co/GfQxZ7y9/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Magenta.png" alt="Smile2 💜"/><span>Smile2 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/GQFDPzFy/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Blue.png" title="Smile2 Blue"><img src="https://i.ibb.co/GQFDPzFy/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Blue.png" alt="Smile2 🔵"/><span>Smile2 🔵</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/LdbpKfXP/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Purple.png" title="Smile2 Purple"><img src="https://i.ibb.co/LdbpKfXP/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Purple.png" alt="Smile2 Pú"/><span>Smile2 Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/ZRXyrRfn/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Amber.png" title="Smile2 Amber"><img src="https://i.ibb.co/ZRXyrRfn/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Amber.png" alt="Smile2 🟡"/><span>Smile2 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/27H8V4Kj/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Mint.png" title="Smile2 Mint"><img src="https://i.ibb.co/27H8V4Kj/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Mint.png" alt="Smile2 Mint"/><span>Smile2 Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/NnTQX0B4/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Grey-850.png" title="Smile2 Grey"><img src="https://i.ibb.co/NnTQX0B4/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-Grey-850.png" alt="Smile2 Grey"/><span>Smile2 Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/N22B2Tyz/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-White.png" title="Smile2 White"><img src="https://i.ibb.co/N22B2Tyz/AWS-Student-Builder-Group-RGB-Icons-Double-Bracket-Smile-White.png" alt="Smile2 ⬜"/><span>Smile2 ⬜</span></button>
+        <!-- WRENCH: 7 colores -->
+        <button class="sticker-btn" data-src="https://i.ibb.co/7tKHVxzY/AWS-Student-Builder-Group-RGB-Icons-Wrench-Magenta.png" title="Wrench Magenta"><img src="https://i.ibb.co/7tKHVxzY/AWS-Student-Builder-Group-RGB-Icons-Wrench-Magenta.png" alt="Wrench 💜"/><span>Wrench 💜</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/7dwbQLxT/AWS-Student-Builder-Group-RGB-Icons-Wrench-Blue.png" title="Wrench Blue"><img src="https://i.ibb.co/7dwbQLxT/AWS-Student-Builder-Group-RGB-Icons-Wrench-Blue.png" alt="Wrench 🔵"/><span>Wrench �</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/wNb8g0Sh/AWS-Student-Builder-Group-RGB-Icons-Wrench-Purple.png" title="Wrench Purple"><img src="https://i.ibb.co/wNb8g0Sh/AWS-Student-Builder-Group-RGB-Icons-Wrench-Purple.png" alt="Wrench Pú"/><span>Wrench Pú</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/cKFWK3Yw/AWS-Student-Builder-Group-RGB-Icons-Wrench-Amber.png" title="Wrench Amber"><img src="https://i.ibb.co/cKFWK3Yw/AWS-Student-Builder-Group-RGB-Icons-Wrench-Amber.png" alt="Wrench 🟡"/><span>Wrench 🟡</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/mVp45MM3/AWS-Student-Builder-Group-RGB-Icons-Wrench-Mint.png" title="Wrench Mint"><img src="https://i.ibb.co/mVp45MM3/AWS-Student-Builder-Group-RGB-Icons-Wrench-Mint.png" alt="Wrench Mint"/><span>Wrench Mint</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/SDVNZkKb/AWS-Student-Builder-Group-RGB-Icons-Wrench-Grey-850.png" title="Wrench Grey"><img src="https://i.ibb.co/SDVNZkKb/AWS-Student-Builder-Group-RGB-Icons-Wrench-Grey-850.png" alt="Wrench Grey"/><span>Wrench Grey</span></button>
+        <button class="sticker-btn" data-src="https://i.ibb.co/nxZfJ81/AWS-Student-Builder-Group-RGB-Icons-Wrench-White.png" title="Wrench White"><img src="https://i.ibb.co/nxZfJ81/AWS-Student-Builder-Group-RGB-Icons-Wrench-White.png" alt="Wrench ⬜"/><span>Wrench ⬜</span></button>
+      </div>
+    </aside>
+  </div><!-- end .app -->
+
+  <script>
+  /* ===== STATE ================================================= */
+  const state = {
+    streaming: false,
+    photoTaken: false,
+    stickers: [],          // { el, x, y, w, h, src }
+    activeSticker: null,
+    dragOffset: { x: 0, y: 0 },
+    resizing: false,
+    resizeStart: { x: 0, y: 0, w: 0, h: 0 }
+  };
+
+  /* ===== DOM REFS ============================================== */
+  const video      = document.getElementById('video');
+  const photoCanvas= document.getElementById('photo-canvas');
+  const stage      = document.getElementById('stage');
+  const placeholder= document.getElementById('placeholder');
+  const frameOverlay = document.getElementById('frame-overlay');
+  const awsWatermark = document.getElementById('aws-watermark');
+  const toggleFrame  = document.getElementById('toggle-frame');
+  const btnOpenCam = document.getElementById('btn-open-cam');
+  const btnSnap    = document.getElementById('btn-snap');
+  const btnRetake  = document.getElementById('btn-retake');
+  const btnDownload= document.getElementById('btn-download');
+  const btnClear   = document.getElementById('btn-clear');
+
+  /* ===== CAMERA =============================================== */
+  btnOpenCam.addEventListener('click', async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      state.streaming = true;
+      btnSnap.disabled = false;
+      btnOpenCam.disabled = true;
+    } catch (e) {
+      alert('No se pudo acceder a la cámara: ' + e.message);
+    }
+  });
+
+  btnSnap.addEventListener('click', () => {
+    const s = stage.clientWidth;
+    photoCanvas.width  = s;
+    photoCanvas.height = s;
+    const ctx = photoCanvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, s, s);
+    photoCanvas.style.display = 'block';
+    video.style.display = 'none';
+    // Stop stream
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    state.streaming = false;
+    state.photoTaken = true;
+    awsWatermark.style.display = 'block';
+    btnSnap.disabled = true;
+    btnRetake.disabled = false;
+    btnDownload.disabled = false;
+    btnClear.disabled = false;
+  });
+
+  btnRetake.addEventListener('click', () => {
+    photoCanvas.style.display = 'none';
+    placeholder.style.display = 'flex';
+    awsWatermark.style.display = 'none';
+    state.photoTaken = false;
+    // Remove placed stickers
+    document.querySelectorAll('.placed-sticker').forEach(el => el.remove());
+    state.stickers = [];
+    btnRetake.disabled = true;
+    btnDownload.disabled = true;
+    btnClear.disabled = true;
+    btnOpenCam.disabled = false;
+    btnSnap.disabled = true;
+  });
+
+  btnClear.addEventListener('click', () => {
+    document.querySelectorAll('.placed-sticker').forEach(el => el.remove());
+    state.stickers = [];
+  });
+  </script>
+
+  <script>
+  /* ===== FRAME TOGGLE ========================================= */
+  toggleFrame.addEventListener('change', () => {
+    frameOverlay.style.display = toggleFrame.checked ? 'block' : 'none';
+  });
+
+  /* ===== ADD STICKER ========================================== */
+  document.querySelectorAll('.sticker-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!state.photoTaken) return;
+      addSticker(btn.dataset.src);
+    });
+  });
+
+  function addSticker(src) {
+    const el = document.createElement('div');
+    el.className = 'placed-sticker';
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+    const size = Math.round(stageW * 0.18);
+    el.style.left = (stageW / 2 - size / 2) + 'px';
+    el.style.top  = (stageH / 2 - size / 2) + 'px';
+    el.style.width  = size + 'px';
+    el.style.height = size + 'px';
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'contain';
+    img.draggable = false;
+
+    const del = document.createElement('button');
+    del.className = 'delete-btn';
+    del.innerHTML = '×';
+    del.addEventListener('click', (e) => { e.stopPropagation(); el.remove(); });
+
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+
+    el.appendChild(img);
+    el.appendChild(del);
+    el.appendChild(resizeHandle);
+    stage.appendChild(el);
+
+    makeDraggable(el, resizeHandle);
+  }
+
+  /* ===== DRAG ================================================= */
+  function makeDraggable(el, handle) {
+    // Drag
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target === handle) return; // handled separately
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const stageRect = stage.getBoundingClientRect();
+      state.activeSticker = el;
+      state.dragOffset.x = e.clientX - rect.left;
+      state.dragOffset.y = e.clientY - rect.top;
+      el.setPointerCapture(e.pointerId);
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (state.activeSticker !== el || state.resizing) return;
+      const stageRect = stage.getBoundingClientRect();
+      let nx = e.clientX - stageRect.left - state.dragOffset.x;
+      let ny = e.clientY - stageRect.top  - state.dragOffset.y;
+      nx = Math.max(0, Math.min(stageRect.width  - el.offsetWidth,  nx));
+      ny = Math.max(0, Math.min(stageRect.height - el.offsetHeight, ny));
+      el.style.left = nx + 'px';
+      el.style.top  = ny + 'px';
+    });
+
+    el.addEventListener('pointerup', () => { state.activeSticker = null; });
+
+    // Resize
+    handle.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      state.resizing = true;
+      state.resizeStart = {
+        x: e.clientX, y: e.clientY,
+        w: el.offsetWidth, h: el.offsetHeight
+      };
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!state.resizing) return;
+      const dx = e.clientX - state.resizeStart.x;
+      const newSize = Math.max(40, state.resizeStart.w + dx);
+      el.style.width  = newSize + 'px';
+      el.style.height = newSize + 'px';
+    });
+    handle.addEventListener('pointerup', () => { state.resizing = false; });
+  }
+  </script>
+
+  <script>
+  /* ===== DOWNLOAD (flatten to canvas) ======================== */
+  // Download uses the shared flattenToBase64 (defined in next script block)
+  btnDownload.addEventListener('click', async () => {
+    const dataUrl = await flattenToBase64();
+    const a = document.createElement('a');
+    a.download = 'sbg-photo-' + Date.now() + '.png';
+    a.href = dataUrl;
+    a.click();
+  });
+
+  function drawImg(ctx, src, x, y, w, h) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload  = () => { ctx.drawImage(img, x, y, w, h); resolve(); };
+      img.onerror = () => resolve();
+      img.src = src;
+    });
+  }
+
+  /* ===== FLATTEN TO BASE64 (shared by download + email) ====== */
+  async function flattenToBase64() {
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+    const out = document.createElement('canvas');
+    out.width = stageW; out.height = stageH;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(photoCanvas, 0, 0, stageW, stageH);
+    if (toggleFrame.checked) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4;
+      ctx.strokeRect(4, 4, stageW - 8, stageH - 8);
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.round(stageW * 0.04)}px "Segoe UI", Arial, sans-serif`;
+      ctx.textAlign = 'center'; ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 6;
+      ctx.fillText('AWS Student Builder Group', stageW / 2, Math.round(stageH * 0.06));
+      ctx.shadowBlur = 0;
+      await drawImg(ctx, 'https://i.ibb.co/zht0VtMS/AWS-Student-Builder-Group-RGB-Program-Icon-White.png', 14, stageH - 56, 44, 44);
+    }
+    const stageRect = stage.getBoundingClientRect();
+    for (const s of stage.querySelectorAll('.placed-sticker')) {
+      const r = s.getBoundingClientRect();
+      await drawImg(ctx, s.querySelector('img').src, r.left - stageRect.left, r.top - stageRect.top, r.width, r.height);
+    }
+    await drawImg(ctx, 'https://i.ibb.co/Ng3GhCf7/AWS-smile-RGB-WHT.png', stageW - 110, stageH - 54, 96, 40);
+    return out.toDataURL('image/png');
+  }
+  </script>
+
+  <!-- ── EMAIL MODAL ────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="email-modal">
+    <div class="modal">
+      <button class="modal-close" id="modal-close-btn" aria-label="Cerrar">×</button>
+      <h2>📧 Enviar tu foto</h2>
+      <p>Ingresa tu nombre y correo para recibir la foto del evento.</p>
+      <label for="input-name">Nombre</label>
+      <input type="text" id="input-name" placeholder="Tu nombre completo" autocomplete="name" />
+      <label for="input-email">Correo electrónico</label>
+      <input type="email" id="input-email" placeholder="tuemail@ejemplo.com" autocomplete="email" />
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel-btn">Cancelar</button>
+        <button class="btn btn-send" id="modal-submit-btn">Enviar foto 🚀</button>
+      </div>
+      <div class="send-status" id="send-status"></div>
+    </div>
+  </div>
+
+  <script>
+  /* ===== LAMBDA URL – ya no se usa, EmailJS maneja el envío ===== */
+  const LAMBDA_URL = "";
+  /* =============================================================== */
+
+  const emailModal     = document.getElementById('email-modal');
+  const modalCloseBtn  = document.getElementById('modal-close-btn');
+  const modalCancelBtn = document.getElementById('modal-cancel-btn');
+  const modalSubmitBtn = document.getElementById('modal-submit-btn');
+  const sendStatus     = document.getElementById('send-status');
+  const inputName      = document.getElementById('input-name');
+  const inputEmail     = document.getElementById('input-email');
+  const btnSend        = document.getElementById('btn-send');
+
+  // Abrir modal
+  btnSend.addEventListener('click', () => {
+    sendStatus.textContent = '';
+    sendStatus.className = 'send-status';
+    emailModal.classList.add('active');
+    inputName.focus();
+  });
+
+  // Cerrar modal
+  [modalCloseBtn, modalCancelBtn].forEach(b => {
+    b.addEventListener('click', () => emailModal.classList.remove('active'));
+  });
+  emailModal.addEventListener('click', (e) => {
+    if (e.target === emailModal) emailModal.classList.remove('active');
+  });
+
+  // Enviar foto por correo con EmailJS
+  modalSubmitBtn.addEventListener('click', async () => {
+    const name  = inputName.value.trim();
+    const email = inputEmail.value.trim();
+    if (!name)  { showStatus('Por favor ingresa tu nombre.', false); return; }
+    if (!email || !email.includes('@')) {
+      showStatus('Por favor ingresa un correo válido.', false); return;
+    }
+    modalSubmitBtn.disabled = true;
+    modalSubmitBtn.textContent = 'Enviando…';
+    showStatus('', false);
+    try {
+      const photoDataUrl = await flattenToBase64();
+
+      // Comprimir foto para EmailJS (max 50KB)
+      const compressed = await compressPhoto(photoDataUrl, 400, 0.5);
+
+      await emailjs.send(
+        'service_hg64jir',
+        'template_3h0mf5w',
+        {
+          to_name:   name,
+          to_email:  email,
+          from_name: 'AWS Student Builder Group',
+          message:   `Hola ${name}, Futuro Builder Member 💜\n\n¡Esta es tu foto del evento! ¡Saliste muy Guap@! 📸\n\nEsperamos que te unas a nuestra comunidad y juntos sigamos dando el siguiente paso: de aprender… a construir. AWS Student Builder Groups 💜`,
+          photo_url: compressed,
+        }
+      );
+
+      showStatus('¡Foto enviada! Revisa tu correo 💜', true);
+      setTimeout(() => emailModal.classList.remove('active'), 3000);
+    } catch (err) {
+      console.error('EmailJS error:', err);
+      showStatus('Error al enviar: ' + (err.text || err.message || 'Intenta de nuevo.'), false);
+    } finally {
+      modalSubmitBtn.disabled = false;
+      modalSubmitBtn.textContent = 'Enviar foto 🚀';
+    }
+  });
+
+  function showStatus(msg, ok) {
+    sendStatus.textContent = msg;
+    sendStatus.className = 'send-status ' + (ok ? 'ok' : 'err');
+  }
+
+  // Comprime la foto a maxSize px y calidad q para EmailJS
+  function compressPhoto(dataUrl, maxSize, quality) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = dataUrl;
+    });
+  }
+
+  // Habilitar/deshabilitar botón enviar junto con descargar
+  document.getElementById('btn-snap').addEventListener('click', () => {
+    setTimeout(() => { document.getElementById('btn-send').disabled = false; }, 150);
+  });
+  document.getElementById('btn-retake').addEventListener('click', () => {
+    document.getElementById('btn-send').disabled = true;
+  });
+  </script>
+</body>
+</html>
